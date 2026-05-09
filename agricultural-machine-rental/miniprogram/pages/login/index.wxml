@@ -1,0 +1,17 @@
+<view class="container">
+  <!-- Logo区域 -->
+  <view class="logo-section">
+    <view class="logo">🚜</view>
+    <view class="app-name">农机租赁</view>
+    <view class="app-desc">让农业生产更高效</view>
+  </view>
+
+  <!-- 登录按钮 -->
+  <view class="login-section">
+    <button class="login-btn" bindtap="onLogin" loading="{{loading}}">
+      <text class="wechat-icon">💬</text>
+      <text>微信一键登录</text>
+    </button>
+    <view class="login-tip">登录即表示同意相关条款</view>
+  </view>
+</view>

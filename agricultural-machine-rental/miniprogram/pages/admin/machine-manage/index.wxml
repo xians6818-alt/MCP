@@ -1,0 +1,125 @@
+<view class="container">
+  <!-- 提示 -->
+  <view class="tips">
+    <text class="tip-icon">💡</text>
+    <text class="tip-text">点击"配置价格"修改每亩单价，修改后自动保存</text>
+  </view>
+  
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索农机名称、类别或介绍" bindinput="onSearch" value="{{searchKeyword}}" />
+  </view>
+
+  <!-- 农机列表 -->
+  <view class="machine-list" wx:if="{{machines.length > 0}}">
+    <view class="machine-card" wx:for="{{machines}}" wx:key="_id">
+      <image class="machine-image" src="{{item.image}}" mode="aspectFill" />
+      <view class="machine-info">
+        <view class="machine-name">{{item.name}}</view>
+        
+        <!-- 库存管理 -->
+        <view class="stock-row">
+          <text class="stock-label">库存：</text>
+          <view class="stock-controls">
+            <view class="stock-btn" bindtap="onMinusStock" data-id="{{item._id}}" data-stock="{{item.stock}}">−</view>
+            <text class="stock-num">{{item.stock}}</text>
+            <view class="stock-btn" bindtap="onPlusStock" data-id="{{item._id}}" data-stock="{{item.stock}}">+</view>
+          </view>
+      </view>
+
+        <!-- 价格配置和删除 -->
+        <view class="machine-actions">
+          <view class="price-btn" bindtap="onConfigPrice" data-index="{{index}}">
+            <text>💰 配置价格</text>
+          </view>
+          <view class="delete-btn" bindtap="onDeleteMachine" data-id="{{item._id}}">
+            <text>🗑️ 删除</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && machines.length === 0}}">
+    <text class="empty-icon">🚜</text>
+    <text class="empty-text">暂无农机</text>
+    <button class="init-btn" bindtap="onInitData">📦 初始化示例数据</button>
+  </view>
+  
+  <!-- 添加农机按钮 -->
+  <view class="add-machine-btn" wx:if="{{!loading && machines.length > 0}}">
+    <button class="add-btn" bindtap="onAddMachine">➕ 添加农机</button>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+
+  <!-- 价格配置弹窗 -->
+  <view class="modal-mask" wx:if="{{showPriceModal}}" bindtap="onCloseModal">
+    <view class="modal-content" catchtap="preventBubble">
+      <view class="modal-header">
+        <text class="modal-title">配置价格</text>
+        <view class="modal-close" bindtap="onCloseModal">✕</view>
+      </view>
+      
+      <view class="machine-tip">{{currentMachine.name}}</view>
+      
+      <!-- 价格列表 -->
+      <view class="price-list">
+        <view class="price-item" wx:for="{{currentPricing}}" wx:key="type">
+          <text class="price-name">{{item.name}}</text>
+          <view class="price-input-row">
+            <input 
+              class="price-input" 
+              type="number" 
+              value="{{item.price}}" 
+              data-type="{{item.type}}"
+              bindinput="onPriceInput"
+            />
+            <text class="price-unit">元/亩</text>
+          </view>
+        </view>
+      </view>
+
+      <button class="save-btn" bindtap="onSavePrice">保存</button>
+    </view>
+  </view>
+  
+  <!-- 添加农机弹窗 -->
+  <view class="modal-mask" wx:if="{{showAddModal}}" bindtap="onCloseAddModal">
+    <view class="modal-content" catchtap="preventBubble">
+      <view class="modal-header">
+        <text class="modal-title">添加农机</text>
+        <view class="modal-close" bindtap="onCloseAddModal">✕</view>
+      </view>
+      
+      <view class="form-group">
+        <text class="form-label">农机名称</text>
+        <input class="form-input" placeholder="请输入农机名称" bindinput="onAddMachineInput" data-field="name" />
+      </view>
+      
+      <view class="form-group">
+        <text class="form-label">农机类别</text>
+        <input class="form-input" placeholder="请输入农机类别" bindinput="onAddMachineInput" data-field="category" />
+      </view>
+      
+      <view class="form-group">
+        <text class="form-label">农机图片</text>
+        <input class="form-input" placeholder="请输入图片URL" bindinput="onAddMachineInput" data-field="image" />
+      </view>
+      
+      <view class="form-group">
+        <text class="form-label">农机介绍</text>
+        <textarea class="form-textarea" placeholder="请输入农机介绍" bindinput="onAddMachineInput" data-field="intro" />
+      </view>
+      
+      <view class="form-group">
+        <text class="form-label">库存数量</text>
+        <input class="form-input" type="number" placeholder="请输入库存数量" bindinput="onAddMachineInput" data-field="stock" />
+      </view>
+
+      <button class="save-btn" bindtap="onSubmitAddMachine">保存</button>
+    </view>
+  </view>
+</view>

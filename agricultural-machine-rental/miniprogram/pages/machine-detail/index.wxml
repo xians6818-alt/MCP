@@ -1,0 +1,49 @@
+<view class="container">
+  <!-- 农机图片 -->
+  <view class="image-section">
+    <image class="machine-image" src="{{machine.image}}" mode="aspectFill" binderror="onImageError"></image>
+  </view>
+
+  <!-- 农机信息 -->
+  <view class="info-section">
+    <view class="name">{{machine.name}}</view>
+    <view class="category">{{machine.categoryText}}</view>
+    <view class="intro">{{machine.intro}}</view>
+    
+    <!-- 规格参数 -->
+    <view class="specs-section" wx:if="{{machine.specs && machine.specs.length > 0}}">
+      <view class="section-title">规格参数</view>
+      <view class="specs-list">
+        <view class="spec-item" wx:for="{{machine.specs}}" wx:key="index">
+          <text class="spec-label">{{item.label}}</text>
+          <text class="spec-value">{{item.value}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 业务类型及价格 -->
+  <view class="price-section">
+    <view class="section-title">业务类型及价格</view>
+    <view class="price-list" wx:if="{{machine.pricing && machine.pricing.length > 0}}">
+      <view class="price-item" wx:for="{{machine.pricing}}" wx:key="type">
+        <text class="price-name">{{item.name}}</text>
+        <text class="price-value">¥{{item.price}}/亩</text>
+      </view>
+    </view>
+    <view class="price-empty" wx:else>
+      <text>暂无价格信息</text>
+    </view>
+  </view>
+
+  <!-- 底部按钮 -->
+  <view class="footer">
+    <view class="footer-stock" wx:if="{{machine.stock !== undefined}}">
+      <text class="stock-icon">📦</text>
+      <text class="{{machine.stock > 0 ? 'stock-have' : 'stock-none'}}">
+        {{machine.stock > 0 ? '库存 ' + machine.stock + ' 台' : '已无库存'}}
+      </text>
+    </view>
+    <button class="rent-btn {{machine.stock !== undefined && machine.stock <= 0 ? 'disabled' : ''}}" bindtap="onRentTap" disabled="{{machine.stock !== undefined && machine.stock <= 0}}">立即租赁</button>
+  </view>
+</view>

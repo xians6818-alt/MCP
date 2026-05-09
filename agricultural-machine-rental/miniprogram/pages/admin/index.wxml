@@ -1,0 +1,137 @@
+<view class="container">
+  <!-- 顶部统计 -->
+  <view class="stats-card">
+    <view class="stat-item">
+      <text class="stat-value">{{stats.totalOrders}}</text>
+      <text class="stat-label">总订单</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value warning">{{stats.pendingOrders}}</text>
+      <text class="stat-label">待处理</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value success">{{stats.totalRevenue}}</text>
+      <text class="stat-label">总收入(元)</text>
+    </view>
+  </view>
+
+  <!-- 快捷操作 -->
+  <view class="quick-actions">
+    <view class="action-btn" bindtap="onManageStock">
+      <view class="action-icon">🚜</view>
+      <text class="action-text">农机管理</text>
+    </view>
+    <view class="action-btn" bindtap="onViewAllOrders">
+      <view class="action-icon">📋</view>
+      <text class="action-text">全部订单</text>
+    </view>
+    <view class="action-btn" bindtap="onRefreshData">
+      <view class="action-icon">🔄</view>
+      <text class="action-text">刷新数据</text>
+    </view>
+  </view>
+
+  <!-- 待处理订单 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">⏳ 待处理订单</text>
+      <text class="section-count" wx:if="{{pendingOrders.length > 0}}">{{pendingOrders.length}}</text>
+    </view>
+
+    <view class="order-list" wx:if="{{pendingOrders.length > 0}}">
+      <view class="order-card" wx:for="{{pendingOrders}}" wx:key="_id">
+        <view class="order-header">
+          <text class="order-no">{{item.order_no}}</text>
+          <view class="status-badge pending">待确认</view>
+        </view>
+        
+        <view class="order-info">
+          <view class="info-row">
+            <text class="info-label">农机：</text>
+            <text class="info-value">{{item.machine_name}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">客户：</text>
+            <text class="info-value">{{item.customer_name}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">电话：</text>
+            <text class="info-value phone" bindtap="onCallPhone" data-phone="{{item.customer_phone}}">{{item.customer_phone}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">用途：</text>
+            <text class="info-value">{{item.usageText}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">面积：</text>
+            <text class="info-value">{{item.land_area}}亩</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">金额：</text>
+            <text class="info-value price">¥{{item.total_price}}</text>
+          </view>
+        </view>
+
+        <view class="order-actions">
+          <button class="btn btn-reject" size="mini" bindtap="onRejectOrder" data-order="{{item}}">拒绝</button>
+          <button class="btn btn-confirm" size="mini" bindtap="onConfirmOrder" data-order="{{item}}">确认</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:else>
+      <text class="empty-icon">✅</text>
+      <text class="empty-text">暂无待处理订单</text>
+    </view>
+  </view>
+
+  <!-- 最近订单 -->
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">📝 最近订单</text>
+    </view>
+
+    <view class="order-list" wx:if="{{recentOrders.length > 0}}">
+      <view class="order-card" wx:for="{{recentOrders}}" wx:key="_id">
+        <view class="order-header">
+          <text class="order-no">{{item.order_no}}</text>
+          <view class="status-badge {{item.statusClass}}">{{item.statusText}}</view>
+        </view>
+        
+        <view class="order-info">
+          <view class="info-row">
+            <text class="info-label">农机：</text>
+            <text class="info-value">{{item.machine_name}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">客户：</text>
+            <text class="info-value">{{item.customer_name}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">金额：</text>
+            <text class="info-value price">¥{{item.total_price}}</text>
+          </view>
+          <view class="info-row">
+            <text class="info-label">时间：</text>
+            <text class="info-value">{{item.createdText}}</text>
+          </view>
+        </view>
+
+        <view class="order-actions" wx:if="{{item.status === 'pending'}}">
+          <button class="btn btn-reject" size="mini" bindtap="onRejectOrder" data-order="{{item}}">拒绝</button>
+          <button class="btn btn-confirm" size="mini" bindtap="onConfirmOrder" data-order="{{item}}">确认</button>
+        </view>
+        <view class="order-actions" wx:else>
+          <button class="btn btn-detail" size="mini" bindtap="onViewDetail" data-order="{{item}}">详情</button>
+          <button class="btn btn-action" size="mini" wx:if="{{item.status === 'confirmed'}}" bindtap="onStartWork" data-order="{{item}}">开始作业</button>
+          <button class="btn btn-action" size="mini" wx:if="{{item.status === 'in_progress'}}" bindtap="onCompleteWork" data-order="{{item}}">完成作业</button>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:else>
+      <text class="empty-icon">📭</text>
+      <text class="empty-text">暂无订单</text>
+    </view>
+  </view>
+</view>

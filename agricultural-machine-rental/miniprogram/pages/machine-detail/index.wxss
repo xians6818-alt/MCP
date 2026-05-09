@@ -1,0 +1,189 @@
+.container {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: 140rpx;
+}
+
+/* 图片区域 */
+.image-section {
+  width: 100%;
+  height: 500rpx;
+  background: #eee;
+}
+
+.machine-image {
+  width: 100%;
+  height: 100%;
+}
+
+/* 信息区域 */
+.info-section {
+  background: #fff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16rpx;
+}
+
+.category {
+  display: inline-block;
+  padding: 6rpx 16rpx;
+  background: #e8f7ee;
+  color: #07c160;
+  font-size: 24rpx;
+  border-radius: 8rpx;
+  margin-bottom: 20rpx;
+}
+
+.intro {
+  font-size: 28rpx;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 30rpx;
+}
+
+/* 规格参数 */
+.specs-section {
+  border-top: 1rpx solid #eee;
+  padding-top: 30rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20rpx;
+}
+
+.specs-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.spec-item {
+  width: 50%;
+  padding: 16rpx 0;
+  display: flex;
+  align-items: center;
+}
+
+.spec-label {
+  font-size: 26rpx;
+  color: #999;
+  margin-right: 16rpx;
+}
+
+.spec-value {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+/* 价格区域 - 新样式 */
+.price-section {
+  background: #fff;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.price-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.price-item {
+  display: flex;
+  align-items: center;
+  background: #f8f8f8;
+  padding: 16rpx 24rpx;
+  border-radius: 12rpx;
+  min-width: 45%;
+}
+
+.price-name {
+  font-size: 28rpx;
+  color: #666;
+  margin-right: 16rpx;
+}
+
+.price-value {
+  font-size: 30rpx;
+  color: #ff6b00;
+  font-weight: 600;
+}
+
+.price-empty {
+  text-align: center;
+  padding: 40rpx;
+  color: #999;
+  font-size: 28rpx;
+}
+
+/* 底部按钮 */
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 30rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  box-shadow: 0 -4rpx 20rpx rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.footer-stock {
+  display: flex;
+  align-items: center;
+  padding: 0 20rpx;
+  height: 60rpx;
+  background: #f5f5f5;
+  border-radius: 30rpx;
+}
+
+.stock-icon {
+  font-size: 28rpx;
+  margin-right: 8rpx;
+}
+
+.stock-have {
+  font-size: 26rpx;
+  color: #666;
+}
+
+.stock-none {
+  font-size: 26rpx;
+  color: #f44336;
+}
+
+.rent-btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: linear-gradient(135deg, #07c160, #04a649);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 500;
+  border-radius: 44rpx;
+  border: none;
+}
+
+.rent-btn::after {
+  border: none;
+}
+
+.rent-btn:active {
+  opacity: 0.9;
+}
+
+.rent-btn.disabled {
+  background: #ccc;
+}

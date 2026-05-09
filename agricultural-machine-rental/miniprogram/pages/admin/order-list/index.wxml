@@ -1,0 +1,70 @@
+<view class="container">
+  <!-- 状态筛选 -->
+  <view class="status-tabs">
+    <view class="status-tab {{statusFilter === '' ? 'active' : ''}}" bindtap="onFilterStatus" data-status="">全部</view>
+    <view class="status-tab {{statusFilter === 'pending' ? 'active' : ''}}" bindtap="onFilterStatus" data-status="pending">待确认</view>
+    <view class="status-tab {{statusFilter === 'confirmed' ? 'active' : ''}}" bindtap="onFilterStatus" data-status="confirmed">已确认</view>
+    <view class="status-tab {{statusFilter === 'completed' ? 'active' : ''}}" bindtap="onFilterStatus" data-status="completed">已完成</view>
+  </view>
+  
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <input 
+      class="search-input" 
+      placeholder="搜索客户姓名、电话、地址或用途" 
+      bindinput="onSearch" 
+      value="{{searchKeyword}}"
+    />
+  </view>
+
+  <!-- 订单列表 -->
+  <view class="order-list">
+    <view class="order-card" wx:for="{{orders}}" wx:key="_id" bindtap="onOrderTap" data-id="{{item._id}}">
+      <view class="order-header">
+        <text class="order-name">{{item.machine_name}}</text>
+        <text class="order-status {{item.status}}">{{statusMap[item.status]}}</text>
+      </view>
+      <view class="order-body">
+        <view class="order-row">
+          <text class="order-label">客户：</text>
+          <text class="order-value">{{item.customer_name}}</text>
+        </view>
+        <view class="order-row">
+          <text class="order-label">业务：</text>
+          <text class="order-value">{{item.usage_name}} × {{item.mu}}亩</text>
+        </view>
+        <view class="order-row">
+          <text class="order-label">费用：</text>
+          <text class="order-price">¥{{item.total_price}}</text>
+        </view>
+        <view class="order-row">
+          <text class="order-label">时间：</text>
+          <text class="order-value">{{item.created_at}}</text>
+        </view>
+      </view>
+      
+      <!-- 操作按钮 -->
+      <view class="order-actions" wx:if="{{item.status === 'pending'}}">
+        <button class="action-btn confirm" catchtap="onConfirmOrder" data-id="{{item._id}}">确认</button>
+        <button class="action-btn cancel" catchtap="onCancelOrder" data-id="{{item._id}}">取消</button>
+        <button class="action-btn delete" catchtap="onDeleteOrder" data-id="{{item._id}}">删除</button>
+      </view>
+      <view class="order-actions" wx:if="{{item.status === 'confirmed'}}">
+        <button class="action-btn complete" catchtap="onCompleteOrder" data-id="{{item._id}}">完成</button>
+        <button class="action-btn delete" catchtap="onDeleteOrder" data-id="{{item._id}}">删除</button>
+      </view>
+      <view class="order-actions" wx:if="{{item.status === 'completed' || item.status === 'cancelled'}}">
+        <button class="action-btn delete" catchtap="onDeleteOrder" data-id="{{item._id}}">删除</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && orders.length === 0}}">
+    <text class="empty-icon">📋</text>
+    <text class="empty-text">暂无订单</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+</view>

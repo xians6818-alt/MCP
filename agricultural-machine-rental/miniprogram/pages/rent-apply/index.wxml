@@ -1,0 +1,85 @@
+<view class="container">
+  <!-- 农机信息 -->
+  <view class="machine-card">
+    <image class="machine-image" src="{{machine.image}}" mode="aspectFill" />
+    <view class="machine-info">
+      <text class="machine-name">{{machine.name}}</text>
+      <text class="machine-intro">{{machine.intro}}</text>
+      <view class="stock-notice {{machine.stock <= 0 ? 'no-stock' : ''}}">
+        <text>📦 库存: {{machine.stock}}台</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 租赁表单 -->
+  <view class="form-section">
+    <view class="form-title">租赁信息</view>
+
+    <view class="form-item">
+      <view class="form-label"><text class="required">*</text>联系人姓名</view>
+      <input class="form-input" placeholder="请输入联系人姓名" bindinput="onInputChange" data-field="customer_name" value="{{formData.customer_name}}" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label"><text class="required">*</text>联系电话</view>
+      <input class="form-input" type="number" placeholder="请输入联系电话" maxlength="11" bindinput="onInputChange" data-field="customer_phone" value="{{formData.customer_phone}}" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label"><text class="required">*</text>选择业务类型</view>
+      <view class="usage-grid">
+        <view class="usage-item {{formData.usage_type === item.type ? 'active' : ''}}" 
+              wx:for="{{pricingOptions}}" 
+              wx:key="type"
+              bindtap="onUsageSelect"
+              data-type="{{item.type}}"
+              data-name="{{item.name}}"
+              data-price="{{item.price}}">
+          <text class="usage-name">{{item.name}}</text>
+          <text class="usage-price">¥{{item.price}}/亩</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label"><text class="required">*</text>作业亩数</view>
+      <view class="land-row">
+        <input class="form-input land-input" type="digit" placeholder="请输入预估作业亩数" bindinput="onInputChange" data-field="mu" value="{{formData.mu}}" />
+        <text class="land-unit">亩</text>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label"><text class="required">*</text>作业地址</view>
+      <input class="form-input" placeholder="请输入详细作业地址" bindinput="onInputChange" data-field="location" value="{{formData.location}}" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">备注说明</view>
+      <textarea class="form-textarea" placeholder="可补充地块具体位置、进场时间等信息（选填）" bindinput="onInputChange" data-field="remark" value="{{formData.remark}}" />
+    </view>
+  </view>
+
+  <!-- 费用预览 -->
+  <view class="fee-section">
+    <view class="fee-row">
+      <text class="fee-label">预计费用</text>
+      <view class="fee-value">
+        <text class="fee-symbol">¥</text>
+        <text class="fee-amount">{{estimatedPrice}}</text>
+      </view>
+    </view>
+    <view class="fee-detail" wx:if="{{selectedPricing && formData.mu}}">
+      <text>{{selectedPricing.name}}：{{selectedPricing.price}}元/亩 × {{formData.mu}}亩</text>
+    </view>
+  </view>
+
+  <!-- 提交按钮 -->
+  <view class="submit-section">
+    <button class="submit-btn {{isSubmitting || machine.stock <= 0 ? 'disabled' : ''}}" 
+            bindtap="onSubmit"
+            disabled="{{isSubmitting || machine.stock <= 0}}">
+      {{machine.stock <= 0 ? '库存不足' : (isSubmitting ? '提交中...' : '提交租赁申请')}}
+    </button>
+  </view>
+</view>

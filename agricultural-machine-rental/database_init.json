@@ -1,0 +1,112 @@
+{
+  "collections": [
+    {
+      "name": "machines",
+      "description": "农机列表",
+      "fields": [
+        { "name": "name", "type": "string", "description": "农机名称" },
+        { "name": "category", "type": "string", "description": "分类" },
+        { "name": "image", "type": "string", "description": "图片URL" },
+        { "name": "intro", "type": "string", "description": "简介" },
+        { "name": "price_per_day", "type": "number", "description": "日租金" },
+        { "name": "price_per_hour", "type": "number", "description": "时租金" },
+        { "name": "min_hours", "type": "number", "description": "最小租赁时长" },
+        { "name": "specs", "type": "object", "description": "规格参数" },
+        { "name": "status", "type": "string", "description": "状态" },
+        { "name": "created_at", "type": "date", "description": "创建时间" },
+        { "name": "updated_at", "type": "date", "description": "更新时间" }
+      ],
+      "indexes": [
+        { "fields": ["status"], "name": "idx_status" },
+        { "fields": ["category"], "name": "idx_category" },
+        { "fields": ["created_at"], "name": "idx_created_at" }
+      ]
+    },
+    {
+      "name": "rent_orders",
+      "description": "租赁订单",
+      "fields": [
+        { "name": "order_no", "type": "string", "description": "订单号" },
+        { "name": "machine_id", "type": "string", "description": "农机ID" },
+        { "name": "machine_name", "type": "string", "description": "农机名称" },
+        { "name": "machine_image", "type": "string", "description": "农机图片" },
+        { "name": "customer_name", "type": "string", "description": "联系人" },
+        { "name": "customer_phone", "type": "string", "description": "电话" },
+        { "name": "rent_type", "type": "string", "description": "租赁类型" },
+        { "name": "rent_days", "type": "number", "description": "租赁天数" },
+        { "name": "rent_hours", "type": "number", "description": "租赁小时" },
+        { "name": "land_area", "type": "number", "description": "地块亩数" },
+        { "name": "location", "type": "object", "description": "位置信息" },
+        { "name": "status", "type": "string", "description": "订单状态" },
+        { "name": "total_price", "type": "number", "description": "总费用" },
+        { "name": "remark", "type": "string", "description": "备注" },
+        { "name": "created_at", "type": "date", "description": "创建时间" },
+        { "name": "updated_at", "type": "date", "description": "更新时间" }
+      ],
+      "indexes": [
+        { "fields": ["status"], "name": "idx_status" },
+        { "fields": ["created_at"], "name": "idx_created_at" },
+        { "fields": ["order_no"], "name": "idx_order_no" }
+      ]
+    }
+  ],
+  "sample_data": {
+    "machines": [
+      {
+        "name": "东方红LX1504大型拖拉机",
+        "category": "tractor",
+        "image": "https://img-blog.csdnimg.cn/direct/a1d3b9d1c9b54c5e8d1c3b9d1c9b54c5.png",
+        "intro": "150马力大型轮式拖拉机，适用于大面积农田作业，深松、旋耕、播种样样精通",
+        "price_per_day": 800,
+        "price_per_hour": 100,
+        "min_hours": 4,
+        "specs": { "power": "150马力", "weight": "4500kg", "type": "轮式" },
+        "status": "available"
+      },
+      {
+        "name": "雷沃M1804-K轮式拖拉机",
+        "category": "tractor",
+        "image": "https://img-blog.csdnimg.cn/direct/b2d4e6c2d0e64e6a8d2c4e6c2d0e64e6.png",
+        "intro": "180马力智能拖拉机，配备自动导航系统，作业精度高，省时省力",
+        "price_per_day": 1000,
+        "price_per_hour": 120,
+        "min_hours": 4,
+        "specs": { "power": "180马力", "weight": "5200kg", "type": "轮式" },
+        "status": "available"
+      },
+      {
+        "name": "约翰迪尔S760联合收割机",
+        "category": "harvester",
+        "image": "https://img-blog.csdnimg.cn/direct/c3e5f7d3e1f75f7b9e3d5f7d3e1f75f7.png",
+        "intro": "高效谷物联合收割机，一机多用，可收割小麦、玉米、水稻等多种作物",
+        "price_per_day": 1500,
+        "price_per_hour": 180,
+        "min_hours": 6,
+        "specs": { "power": "320马力", "capacity": "12L", "type": "履带式" },
+        "status": "available"
+      },
+      {
+        "name": "大疆T50农业无人机",
+        "category": "sprayer",
+        "image": "https://img-blog.csdnimg.cn/direct/e5g7h9f5g3h97h9d1g5f7h9f5g3h97.png",
+        "intro": "智能植保无人机，精准喷洒，高效作业，适合大面积病虫害防治",
+        "price_per_day": 500,
+        "price_per_hour": 80,
+        "min_hours": 2,
+        "specs": { "load": "40L", "width": "5m", "type": "电动多旋翼" },
+        "status": "available"
+      },
+      {
+        "name": "小麦精密播种机",
+        "category": "seeder",
+        "image": "https://img-blog.csdnimg.cn/direct/f6h8i0g6h4i08i0e2h6i8i0g6h4i08.png",
+        "intro": "12行小麦播种机，播种均匀，深浅一致，出苗整齐",
+        "price_per_day": 400,
+        "price_per_hour": 60,
+        "min_hours": 4,
+        "specs": { "rows": "12行", "width": "2.4m", "type": "牵引式" },
+        "status": "available"
+      }
+    ]
+  }
+}

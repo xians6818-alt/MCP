@@ -1,0 +1,89 @@
+<view class="container">
+  <!-- 订单状态 -->
+  <view class="status-card">
+    <text class="status-text {{order.status}}">{{statusMap[order.status]}}</text>
+    <text class="status-time" wx:if="{{order.confirmed_at}}">{{order.confirmed_at}}</text>
+  </view>
+
+  <!-- 农机信息 -->
+  <view class="info-card">
+    <view class="card-title">农机信息</view>
+    <view class="info-row">
+      <text class="info-label">农机名称</text>
+      <text class="info-value">{{order.machine_name}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">业务类型</text>
+      <text class="info-value">{{order.usage_name}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">作业亩数</text>
+      <text class="info-value">{{order.mu}} 亩</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">单价</text>
+      <text class="info-value">{{order.unit_price}} 元/亩</text>
+    </view>
+    <view class="info-row total">
+      <text class="info-label">总费用</text>
+      <text class="info-price">¥{{order.total_price}}</text>
+    </view>
+  </view>
+
+  <!-- 联系信息 -->
+  <view class="info-card">
+    <view class="card-title">联系信息</view>
+    <view class="info-row">
+      <text class="info-label">联系人</text>
+      <text class="info-value">{{order.customer_name}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">联系电话</text>
+      <text class="info-value phone" bindtap="onCallPhone">{{order.customer_phone}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">作业地址</text>
+      <text class="info-value">{{order.location}}</text>
+    </view>
+    <view class="info-row" wx:if="{{order.remark}}">
+      <text class="info-label">备注</text>
+      <text class="info-value">{{order.remark}}</text>
+    </view>
+  </view>
+
+  <!-- 订单信息 -->
+  <view class="info-card">
+    <view class="card-title">订单信息</view>
+    <view class="info-row">
+      <text class="info-label">订单编号</text>
+      <text class="info-value">{{order._id}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">下单时间</text>
+      <text class="info-value">{{order.created_at}}</text>
+    </view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="action-section" wx:if="{{showActions}}">
+    <!-- 待确认状态：管理员操作 -->
+    <view wx:if="{{order.status === 'pending' && isAdmin}}">
+      <button class="action-btn confirm" bindtap="onConfirm">✅ 确认订单</button>
+      <button class="action-btn cancel" bindtap="onCancel">❌ 取消订单</button>
+    </view>
+    
+    <!-- 待确认状态：普通用户取消 -->
+    <view wx:if="{{order.status === 'pending' && !isAdmin}}">
+      <button class="action-btn cancel" bindtap="onCancel">❌ 取消订单</button>
+    </view>
+    
+    <!-- 已确认状态 -->
+    <view wx:if="{{order.status === 'confirmed'}}">
+      <button class="action-btn complete" bindtap="onComplete">✅ 完成作业</button>
+      <button class="action-btn cancel" wx:if="{{isAdmin}}" bindtap="onCancel">❌ 取消订单</button>
+    </view>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+</view>

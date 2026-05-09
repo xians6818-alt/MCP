@@ -1,0 +1,10 @@
+streamlit>=1.33
+supabase>=2.4
+openai>=1.30
+pydantic>=2.7
+pydantic-settings>=2.2
+python-dotenv>=1.0
+pandas>=2.0
+click>=8.1
+rich>=13.7
+dashscope>=1.20

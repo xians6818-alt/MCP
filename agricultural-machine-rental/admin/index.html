@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>农机出租 - 订单管理后台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="admin-container">
+    <!-- 顶部导航 -->
+    <header class="header">
+      <div class="header-left">
+        <h1>🚜 农机出租管理后台</h1>
+      </div>
+      <div class="header-right">
+        <button class="btn btn-refresh" onclick="loadOrders()">
+          🔄 刷新数据
+        </button>
+        <span class="env-info">环境: nongjizulin</span>
+      </div>
+    </header>
+
+    <!-- 配置提示条 -->
+    <div class="config-banner" id="configBanner">
+      <span>🔧 当前为演示模式，显示示例数据。</span>
+      <button onclick="switchToRealMode()">切换到真实数据</button>
+      <button onclick="hideBanner()">不再显示</button>
+    </div>
+
+    <!-- 统计卡片 -->
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-content">
+          <div class="stat-value" id="totalOrders">0</div>
+          <div class="stat-label">总订单数</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div class="stat-content">
+          <div class="stat-value" id="totalAmount">¥0</div>
+          <div class="stat-label">总收入</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-content">
+          <div class="stat-value" id="pendingOrders">0</div>
+          <div class="stat-label">待处理</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+          <div class="stat-value" id="completedOrders">0</div>
+          <div class="stat-label">已完成</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+      <span class="filter-label">状态筛选：</span>
+      <button class="filter-btn active" data-status="all" onclick="filterOrders('all')">全部</button>
+      <button class="filter-btn" data-status="pending" onclick="filterOrders('pending')">待确认</button>
+      <button class="filter-btn" data-status="confirmed" onclick="filterOrders('confirmed')">已确认</button>
+      <button class="filter-btn" data-status="in_progress" onclick="filterOrders('in_progress')">进行中</button>
+      <button class="filter-btn" data-status="completed" onclick="filterOrders('completed')">已完成</button>
+      <button class="filter-btn" data-status="cancelled" onclick="filterOrders('cancelled')">已取消</button>
+    </div>
+
+    <!-- 标签页 -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="orders" onclick="switchTab('orders')">📋 订单管理</button>
+      <button class="tab-btn" data-tab="machines" onclick="switchTab('machines')">🚜 农机管理</button>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="orders-section">
+      <div class="section-header">
+        <h2>📋 订单列表</h2>
+        <span class="orders-count">共 <span id="filteredCount">0</span> 条订单</span>
+      </div>
+      <div class="orders-table-wrapper">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>订单号</th>
+              <th>客户信息</th>
+              <th>农机名称</th>
+              <th>租赁方式</th>
+              <th>面积/时长</th>
+              <th>金额</th>
+              <th>位置</th>
+              <th>状态</th>
+              <th>时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <tr class="loading-row">
+              <td colspan="10">
+                <div class="loading">
+                  <span class="loading-spinner"></span>
+                  加载中...
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 农机管理列表 -->
+    <div class="machines-section" id="machinesSection" style="display: none;">
+      <div class="section-header">
+        <h2>🚜 农机库存管理</h2>
+        <span class="orders-count">共 <span id="machinesCount">0</span> 台农机</span>
+      </div>
+      <div class="machines-grid" id="machinesGrid">
+        <div class="loading">
+          <span class="loading-spinner"></span>
+          加载中...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 库存编辑弹窗 -->
+  <div class="modal" id="stockModal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h3>📦 设置库存</h3>
+        <button class="modal-close" onclick="closeStockModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="stockModalBody">
+        <!-- 动态填充 -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeStockModal()">取消</button>
+        <button class="btn btn-primary" onclick="updateMachineStock()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 订单详情弹窗 -->
+  <div class="modal" id="orderModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📋 订单详情</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- 动态填充 -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">关闭</button>
+        <button class="btn btn-primary" onclick="updateOrderStatus()">更新状态</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

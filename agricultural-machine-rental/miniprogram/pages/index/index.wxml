@@ -1,0 +1,36 @@
+<view class="container">
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索农机名称" bindinput="onSearch" value="{{keyword}}" />
+  </view>
+
+  <!-- 农机列表 -->
+  <view class="machine-list">
+    <view class="machine-card" wx:for="{{machines}}" wx:key="_id" bindtap="onMachineTap" data-id="{{item._id}}">
+      <image class="machine-image" src="{{item.image}}" mode="aspectFill" lazy-load />
+      <view class="machine-info">
+        <view class="machine-name">{{item.name}}</view>
+        <view class="machine-intro">{{item.intro}}</view>
+        <view class="machine-footer">
+          <view class="price-info">
+            <text class="price-label">💰 按亩计费</text>
+          </view>
+          <view class="stock-info {{item.stock <= 0 ? 'no-stock' : ''}}">
+            <text>库存: {{item.stock}}台</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{!loading && machines.length === 0}}">
+    <text class="empty-icon">🚜</text>
+    <text class="empty-text">暂无农机</text>
+  </view>
+
+  <!-- 加载中 -->
+  <view class="loading" wx:if="{{loading}}">
+    <text>加载中...</text>
+  </view>
+</view>

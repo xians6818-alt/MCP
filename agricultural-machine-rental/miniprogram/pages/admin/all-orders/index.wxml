@@ -1,0 +1,115 @@
+<view class="container">
+  <!-- 筛选标签 -->
+  <view class="filter-tabs">
+    <view 
+      class="tab-item {{currentFilter === 'all' ? 'active' : ''}}" 
+      bindtap="onFilterChange" 
+      data-filter="all"
+    >
+      全部
+    </view>
+    <view 
+      class="tab-item {{currentFilter === 'pending' ? 'active' : ''}}" 
+      bindtap="onFilterChange" 
+      data-filter="pending"
+    >
+      待确认
+    </view>
+    <view 
+      class="tab-item {{currentFilter === 'confirmed' ? 'active' : ''}}" 
+      bindtap="onFilterChange" 
+      data-filter="confirmed"
+    >
+      已确认
+    </view>
+    <view 
+      class="tab-item {{currentFilter === 'in_progress' ? 'active' : ''}}" 
+      bindtap="onFilterChange" 
+      data-filter="in_progress"
+    >
+      进行中
+    </view>
+    <view 
+      class="tab-item {{currentFilter === 'completed' ? 'active' : ''}}" 
+      bindtap="onFilterChange" 
+      data-filter="completed"
+    >
+      已完成
+    </view>
+  </view>
+  
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <input 
+      class="search-input" 
+      placeholder="搜索客户姓名、电话、地址或用途" 
+      bindinput="onSearch" 
+      value="{{searchKeyword}}"
+    />
+  </view>
+
+  <!-- 订单列表 -->
+  <view class="order-list" wx:if="{{orders.length > 0}}">
+    <view class="order-card" wx:for="{{orders}}" wx:key="_id">
+      <view class="order-header">
+        <text class="order-no">{{item.order_no}}</text>
+        <view class="status-badge {{item.statusClass}}">{{item.statusText}}</view>
+      </view>
+
+      <view class="order-info">
+        <view class="info-row">
+          <text class="info-label">农机：</text>
+          <text class="info-value">{{item.machine_name}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">客户：</text>
+          <text class="info-value">{{item.customer_name}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">电话：</text>
+          <text class="info-value phone" bindtap="onCallPhone" data-phone="{{item.customer_phone}}">{{item.customer_phone}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">用途：</text>
+          <text class="info-value">{{item.usageText}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">地点：</text>
+          <text class="info-value location" bindtap="onOpenMap" data-lat="{{item.location.latitude}}" data-lng="{{item.location.longitude}}" data-address="{{item.location.address}}">{{item.location.address}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">面积：</text>
+          <text class="info-value">{{item.land_area}}亩</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">金额：</text>
+          <text class="info-value price">¥{{item.total_price}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">时间：</text>
+          <text class="info-value">{{item.createdText}}</text>
+        </view>
+      </view>
+
+      <view class="order-actions">
+        <button class="btn btn-sm" wx:if="{{item.status === 'pending'}}" bindtap="onRejectOrder" data-order="{{item}}">拒绝</button>
+        <button class="btn btn-confirm btn-sm" wx:if="{{item.status === 'pending'}}" bindtap="onConfirmOrder" data-order="{{item}}">确认</button>
+        <button class="btn btn-action btn-sm" wx:if="{{item.status === 'confirmed'}}" bindtap="onStartWork" data-order="{{item}}">开始作业</button>
+        <button class="btn btn-success btn-sm" wx:if="{{item.status === 'in_progress'}}" bindtap="onCompleteWork" data-order="{{item}}">完成作业</button>
+        <button class="btn btn-danger btn-sm" bindtap="onDeleteOrder" data-order="{{item}}">删除</button>
+        <button class="btn btn-detail btn-sm" bindtap="onViewDetail" data-order="{{item}}">详情</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:else>
+    <text class="empty-icon">📭</text>
+    <text class="empty-text">暂无订单</text>
+  </view>
+
+  <!-- 加载更多 -->
+  <view class="load-more" wx:if="{{hasMore && orders.length > 0}}">
+    <text bindtap="onLoadMore">加载更多</text>
+  </view>
+</view>
