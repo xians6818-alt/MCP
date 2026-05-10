@@ -1,6 +1,7 @@
 import os
 import json
 import hashlib
+import re
 import tempfile
 from datetime import datetime
 from io import BytesIO
@@ -12,6 +13,7 @@ import streamlit as st
 from adapters.speech_to_text import create_transcriber
 from config import settings
 from core.analyzer import Analyzer
+from core.bump_validator import BumpValidator
 from core.copywriter import Copywriter
 from core.predictor import Predictor
 from core.rubric_engine import RubricEngine
@@ -45,11 +47,13 @@ def init_clients():
     rubric_engine = RubricEngine(llm_client)
     analyzer = Analyzer(llm_client)
     predictor = Predictor(rubric_engine, analyzer)
+    bump_validator = BumpValidator(llm_client)
     copywriter = Copywriter(llm_client)
     file_storage = FileStorage(settings.PREDICTIONS_DIR, settings.SCRIPTS_DIR)
     json_storage = SupabaseStorage(settings.STATE_FILE)
+    rubric_engine.rubric = json_storage.load_active_rubric(rubric_engine.rubric)
     excel_exporter = ExcelExporter(settings.EXPORTS_DIR)
-    return rubric_engine, analyzer, predictor, copywriter, file_storage, json_storage, excel_exporter
+    return rubric_engine, analyzer, predictor, bump_validator, copywriter, file_storage, json_storage, excel_exporter
 
 
 def inject_style():
@@ -285,6 +289,46 @@ def build_prediction_record(prediction, prediction_path: str) -> dict:
     }
 
 
+def parse_prediction_metadata(prediction_path: str) -> dict:
+    path = Path(prediction_path)
+    if not path.exists():
+        return {"prediction_path": str(path)}
+
+    content = path.read_text(encoding="utf-8", errors="ignore")
+
+    def find(pattern: str, default: str = "") -> str:
+        match = re.search(pattern, content, flags=re.MULTILINE)
+        return match.group(1).strip() if match else default
+
+    scores = {}
+    score_match = re.search(
+        r"ER\s*(\d+)\s*/\s*SR\s*(\d+)\s*/\s*HP\s*(\d+)\s*/\s*QL\s*(\d+)\s*/\s*NA\s*(\d+)\s*/\s*AB\s*(\d+)\s*/\s*SAT\s*(\d+)",
+        content,
+    )
+    if score_match:
+        scores = dict(zip(["ER", "SR", "HP", "QL", "NA", "AB", "SAT"], [int(value) for value in score_match.groups()]))
+
+    def find_float(pattern: str):
+        value = find(pattern)
+        try:
+            return float(value) if value else None
+        except ValueError:
+            return None
+
+    return {
+        "prediction_path": str(path),
+        "article_id": find(r"\*\*Article ID\*\*:\s*(.+)"),
+        "title": find(r"\*\*Title\*\*:\s*(.+)", path.stem),
+        "script_path": find(r"\*\*Script Path\*\*:\s*(.+)"),
+        "script_hash": find(r"\*\*Script Hash\*\*:\s*(.+)"),
+        "confidence": find(r"\*\*Confidence\*\*:\s*(.+)"),
+        "bucket": find(r"\*\*Bucket\*\*:\s*`?([^`\n]+)`?"),
+        "center": find_float(r"\*\*.*?\*\*:\s*([0-9.]+)w"),
+        "composite": find_float(r"composite=\*\*([0-9.]+)\*\*"),
+        "scores": scores,
+    }
+
+
 def save_script(input_text: str) -> tuple:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     script_title = f"script_{timestamp}"
@@ -362,8 +406,236 @@ def prediction_history_dataframe(records: list) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def render_prediction_insights(prediction):
+    st.markdown('<p class="section-title">预测洞察</p>', unsafe_allow_html=True)
+
+    st.dataframe(
+        pd.DataFrame(
+            [{"流量池": item.bucket, "概率": f"{int(item.probability * 100)}%"} for item in prediction.distribution]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    with st.expander("反事实场景分析", expanded=True):
+        if prediction.counterfactuals:
+            rows = []
+            for item in prediction.counterfactuals:
+                rows.append(
+                    {
+                        "场景": item.bucket_range,
+                        "概率": f"{int(item.probability * 100)}%",
+                        "验证假设": "；".join(item.verified_hypotheses),
+                        "推翻假设": "；".join(item.rejected_hypotheses),
+                        "新增观察": "；".join(item.new_dimensions),
+                        "解释": item.explanation,
+                    }
+                )
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        else:
+            st.info("暂无反事实分析。")
+
+    with st.expander("相似历史锚点", expanded=False):
+        if prediction.anchors:
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "样本": item.title,
+                            "综合评分": item.composite,
+                            "真实播放量(万)": item.actual_plays,
+                            "相似点": item.similarities,
+                            "差异点": item.differences,
+                        }
+                        for item in prediction.anchors
+                    ]
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("校准池中暂未找到综合评分接近的历史样本。提交几条带评分上下文的复盘数据后，这里会自动变得有用。")
+
+    with st.expander("复盘校准假设", expanded=False):
+        hypothesis = prediction.calibration_hypothesis
+        if hypothesis:
+            st.markdown(f"**对比目标**：{hypothesis.comparison_target}")
+            st.markdown(f"**预期比例**：{hypothesis.expected_ratio}")
+            st.markdown(f"**如果结果反转**：{hypothesis.if_reversed}")
+            st.markdown(f"**如果差距接近预期**：{hypothesis.if_close}")
+        else:
+            st.info("校准样本不足，暂未生成复盘假设。")
+
+    report = prediction.to_markdown()
+    with st.expander("完整预测报告 Markdown", expanded=False):
+        st.text_area("报告内容", report, height=320)
+        st.download_button(
+            "下载完整预测报告",
+            data=report.encode("utf-8"),
+            file_name=f"{prediction.article_id}_prediction_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+            key=f"download_prediction_report_{prediction.article_id}",
+        )
+
+
+def render_rubric_governance(rubric_engine, bump_validator, json_storage):
+    rubric = rubric_engine.rubric
+    st.markdown('<p class="section-title">评分规则治理</p>', unsafe_allow_html=True)
+    st.caption("用于查看当前 7 维评分规则，并在有足够复盘样本后验证权重升级方案。")
+
+    rubric_versions = json_storage.list_rubric_versions()
+    if rubric_versions:
+        version_options = [item["version"] for item in rubric_versions]
+        active_version = next((item["version"] for item in rubric_versions if item.get("is_active")), rubric.current_version)
+        selected_version = st.selectbox(
+            "云端 Rubric 版本",
+            version_options,
+            index=version_options.index(active_version) if active_version in version_options else 0,
+        )
+        if st.button("切换为当前版本", use_container_width=True, key="activate_selected_rubric"):
+            try:
+                json_storage.set_active_rubric_version(selected_version)
+                st.success(f"已切换活跃 Rubric：{selected_version}。页面刷新后生效。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"切换 Rubric 失败：{type(exc).__name__}: {exc}")
+    else:
+        st.info("尚未发现云端 Rubric 版本。可以先保存当前默认版本作为云端基线。")
+        if st.button("保存当前默认 Rubric 到云端", use_container_width=True, key="seed_default_rubric"):
+            try:
+                json_storage.save_rubric_version(rubric, is_active=True)
+                st.success("默认 Rubric 已保存并激活。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"保存默认 Rubric 失败：{type(exc).__name__}: {exc}")
+
+    weights = rubric.current_weights
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "维度": dim.key,
+                    "名称": dim.name,
+                    "权重": weights.get(dim.key, dim.weight),
+                    "说明": dim.description,
+                    "0分标准": dim.examples_0,
+                    "3分标准": dim.examples_3,
+                    "5分标准": dim.examples_5,
+                }
+                for dim in rubric.dimensions
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    proposal = st.text_input("规则升级建议", placeholder="例如：HP*1.3, ER*1.2, SAT*0.8")
+    if st.button("验证规则升级方案", type="primary", use_container_width=True, key="validate_rubric_bump"):
+        if not proposal.strip():
+            st.error("请先输入升级建议。")
+        else:
+            try:
+                calibration_pool = json_storage.get_calibration_pool()
+                usable_pool = [
+                    item
+                    for item in calibration_pool
+                    if isinstance(item.get("scores"), dict) and item.get("scores") and item.get("composite") is not None
+                ]
+                new_rubric = bump_validator.propose_bump(rubric, proposal)
+                if not new_rubric:
+                    st.error("升级建议无法解析，请检查格式。")
+                elif len(usable_pool) < 3:
+                    st.warning("带评分上下文的校准样本少于 3 条，暂不建议升级规则。请先积累更多新版复盘数据。")
+                    st.json({"parsed_version": new_rubric.current_version, "weights": new_rubric.current_weights})
+                else:
+                    result = bump_validator.validate(rubric, new_rubric, usable_pool)
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("排序一致性", f"{result.consistency:.0%}")
+                    col2.metric("Pairwise 回归", "存在" if result.pairwise_regression else "无")
+                    col3.metric("LLM 审计", "通过" if result.audit_passed else "未通过")
+                    if result.passed:
+                        st.success("验证通过：该方案可作为下一版 Rubric 候选。")
+                    else:
+                        st.warning("验证未通过：建议继续积累样本或收窄调整幅度。")
+                    if result.audit_reason:
+                        st.markdown(f"**审计理由**：{result.audit_reason}")
+                    if result.audit_risks:
+                        st.markdown("**关键风险**：" + "；".join(result.audit_risks))
+                    st.json({"candidate_version": new_rubric.current_version, "weights": new_rubric.current_weights})
+                    st.session_state.candidate_rubric_payload = new_rubric.model_dump()
+                    if result.passed:
+                        st.session_state.candidate_rubric_ready = True
+            except Exception as exc:
+                st.error(f"规则验证失败：{type(exc).__name__}: {exc}")
+                with st.expander("查看规则验证错误详情", expanded=True):
+                    st.exception(exc)
+
+    candidate_payload = st.session_state.get("candidate_rubric_payload")
+    if candidate_payload:
+        candidate = rubric.__class__.model_validate(candidate_payload)
+        with st.expander("候选 Rubric 发布", expanded=bool(st.session_state.get("candidate_rubric_ready"))):
+            st.json({"version": candidate.current_version, "weights": candidate.current_weights})
+            can_publish = bool(st.session_state.get("candidate_rubric_ready"))
+            if not can_publish:
+                st.warning("该候选方案尚未通过验证，仅建议继续观察。")
+            if st.button(
+                "保存并激活候选 Rubric",
+                type="primary",
+                use_container_width=True,
+                disabled=not can_publish,
+                key="publish_candidate_rubric",
+            ):
+                try:
+                    json_storage.save_rubric_version(candidate, is_active=True)
+                    st.session_state.pop("candidate_rubric_payload", None)
+                    st.session_state.pop("candidate_rubric_ready", None)
+                    st.success(f"已保存并激活 {candidate.current_version}。")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"发布候选 Rubric 失败：{type(exc).__name__}: {exc}")
+
+
+def render_system_status(rubric_engine, file_storage, json_storage):
+    st.markdown('<p class="section-title">系统状态面板</p>', unsafe_allow_html=True)
+    state = json_storage.load_state()
+    prediction_files = file_storage.list_predictions()
+    script_files = file_storage.list_scripts()
+    rubric_versions = json_storage.list_rubric_versions()
+    active_rubric = next((item for item in rubric_versions if item.get("is_active")), None)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("当前 Rubric", rubric_engine.rubric.current_version)
+    col2.metric("云端 Rubric", active_rubric.get("version") if active_rubric else "默认")
+    col3.metric("脚本文件", len(script_files))
+    col4.metric("预测报告", len(prediction_files))
+
+    col5, col6, col7 = st.columns(3)
+    col5.metric("评估记录", len(state.get("evaluation_records", [])))
+    col6.metric("预测记录", len(state.get("prediction_records", [])))
+    col7.metric("校准样本", state.get("calibration_samples", 0))
+
+    with st.expander("后端能力映射", expanded=False):
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {"能力": "脚本评分", "CLI": "score", "Web入口": "文案生产与评估", "状态": "已接入"},
+                    {"能力": "播放预测", "CLI": "predict", "Web入口": "播放预测", "状态": "已接入"},
+                    {"能力": "复盘校准", "CLI": "retro", "Web入口": "数据校准", "状态": "已接入"},
+                    {"能力": "Rubric 升级验证", "CLI": "bump", "Web入口": "规则治理", "状态": "已接入"},
+                    {"能力": "ASR 转写", "CLI": "transcribe", "Web入口": "爆款视频/音频拆解", "状态": "已接入"},
+                    {"能力": "拍摄通告单导出", "CLI": "export-call-sheet", "Web入口": "文案生产与评估", "状态": "已接入"},
+                    {"能力": "历史导出", "CLI": "export-history", "Web入口": "历史资产", "状态": "已接入"},
+                    {"能力": "系统状态", "CLI": "status", "Web入口": "规则治理", "状态": "已接入"},
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
 inject_style()
-rubric_engine, _, predictor, copywriter, file_storage, json_storage, excel_exporter = init_clients()
+rubric_engine, _, predictor, bump_validator, copywriter, file_storage, json_storage, excel_exporter = init_clients()
 state = json_storage.load_state()
 
 with st.sidebar:
@@ -403,8 +675,8 @@ with st.sidebar:
 
 render_header(state)
 
-tab_breakdown, tab_plan, tab_predict, tab_history, tab_retro = st.tabs(
-    ["爆款视频/音频拆解", "文案生产与评估", "播放预测", "历史资产", "数据校准"]
+tab_breakdown, tab_plan, tab_predict, tab_history, tab_retro, tab_governance = st.tabs(
+    ["爆款视频/音频拆解", "文案生产与评估", "播放预测", "历史资产", "数据校准", "规则治理"]
 )
 
 with tab_breakdown:
@@ -527,6 +799,7 @@ with tab_predict:
                     saved_path = file_storage.save_prediction(prediction)
                     json_storage.add_prediction_record(build_prediction_record(prediction, saved_path))
                     st.session_state.last_prediction = prediction
+                    st.session_state.last_prediction_path = saved_path
                     st.success(f"预测已保存：{saved_path}")
                 except Exception as exc:
                     st.session_state.pop("last_prediction", None)
@@ -540,13 +813,7 @@ with tab_predict:
         col1.metric("预测流量池", prediction.bucket)
         col2.metric("中枢播放量", f"{prediction.center:.1f}万")
         col3.metric("置信度", prediction.confidence)
-        st.dataframe(
-            pd.DataFrame(
-                [{"流量池": item.bucket, "概率": f"{int(item.probability * 100)}%"} for item in prediction.distribution]
-            ),
-            use_container_width=True,
-            hide_index=True,
-        )
+        render_prediction_insights(prediction)
 
 with tab_history:
     state = json_storage.load_state()
@@ -571,9 +838,33 @@ with tab_history:
     st.markdown('<p class="section-title">预测记录</p>', unsafe_allow_html=True)
     st.dataframe(prediction_history_dataframe(predictions), use_container_width=True, hide_index=True)
 
+    st.markdown('<p class="section-title">预测报告库</p>', unsafe_allow_html=True)
+    prediction_files = file_storage.list_predictions()
+    if prediction_files:
+        report_names = [item["name"] for item in prediction_files]
+        report_by_name = {item["name"]: item for item in prediction_files}
+        selected_report = st.selectbox("查看本地完整预测报告", report_names, key="history_report_viewer")
+        report_path = Path(report_by_name[selected_report]["path"])
+        try:
+            report_content = report_path.read_text(encoding="utf-8")
+            st.text_area("预测报告 Markdown", report_content, height=320)
+            st.download_button(
+                "下载该预测报告",
+                data=report_content.encode("utf-8"),
+                file_name=report_path.name,
+                mime="text/markdown",
+                use_container_width=True,
+                key="download_history_prediction_report",
+            )
+        except OSError as exc:
+            st.error(f"读取预测报告失败：{type(exc).__name__}: {exc}")
+    else:
+        st.info("暂无本地预测报告。")
+
 with tab_retro:
     predictions = file_storage.list_predictions()
     prediction_names = [item["name"] for item in predictions]
+    prediction_by_name = {item["name"]: item for item in predictions}
     if not prediction_names:
         st.warning("暂无可复盘的预测文件。")
     else:
@@ -589,15 +880,20 @@ with tab_retro:
                 st.error("请输入有效播放量。")
             else:
                 try:
+                    selected_prediction_path = prediction_by_name.get(selected_prediction, {}).get("path", selected_prediction)
+                    prediction_meta = parse_prediction_metadata(selected_prediction_path)
                     sample = {
                         "title": selected_prediction,
                         "actual_plays": actual_plays,
                         "actual_likes": actual_likes,
                         "actual_shares": actual_shares,
                         "timestamp": datetime.now().strftime("%Y-%m-%d"),
+                        **prediction_meta,
                     }
                     json_storage.add_calibration_sample(sample)
                     state = json_storage.load_state()
+                    if prediction_meta.get("composite") is None:
+                        st.warning("复盘已保存，但未能从预测报告中解析综合评分；该样本暂不能用于锚点匹配。")
                     st.success(f"复盘数据已进入校准池，当前样本数：{state.get('calibration_samples', 0)}")
                 except Exception as exc:
                     st.error(f"提交复盘数据失败：{type(exc).__name__}: {exc}")
@@ -606,3 +902,7 @@ with tab_retro:
 
     state = json_storage.load_state()
     st.metric("校准样本数", state.get("calibration_samples", 0))
+
+with tab_governance:
+    render_rubric_governance(rubric_engine, bump_validator, json_storage)
+    render_system_status(rubric_engine, file_storage, json_storage)

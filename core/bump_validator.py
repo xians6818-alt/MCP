@@ -27,7 +27,8 @@ class BumpValidator:
     def _rescore_all(self, new_rubric: Rubric, calibration_pool: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         rescores = []
         for sample in calibration_pool:
-            scores = DimensionScores.from_dict(sample)
+            score_source = sample.get("scores") if isinstance(sample.get("scores"), dict) else sample
+            scores = DimensionScores.from_dict(score_source)
             weights = new_rubric.current_weights
             total = sum(scores.to_dict().get(dim, 0) * weights.get(dim, 1.0) for dim in scores.to_dict())
             new_composite = total / new_rubric.normalization_constant * 2.0

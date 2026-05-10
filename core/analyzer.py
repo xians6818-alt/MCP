@@ -80,9 +80,12 @@ class Analyzer:
     def find_anchors(self, composite: float, calibration_pool: List[Dict[str, Any]], limit: int = 3) -> List[Dict[str, Any]]:
         anchors = []
         for sample in calibration_pool:
-            sample_composite = sample.get("composite", 0)
+            try:
+                sample_composite = float(sample.get("composite", 0) or 0)
+            except (TypeError, ValueError):
+                continue
             if abs(sample_composite - composite) <= 0.5:
                 anchors.append(sample)
 
-        anchors.sort(key=lambda item: abs(item.get("composite", 0) - composite))
+        anchors.sort(key=lambda item: abs(float(item.get("composite", 0) or 0) - composite))
         return anchors[:limit]
