@@ -26,6 +26,13 @@ class Copywriter:
         }
         return self.llm_client.optimize_script(original_script, score_context)
 
+    def director_chat(self, context: str, messages: List[Dict[str, str]], question: str) -> str:
+        if not question.strip():
+            raise ValueError("Question is required.")
+        if not context.strip():
+            raise ValueError("Director context is required.")
+        return self.llm_client.director_chat(context, messages, question)
+
     def _weaknesses(self, score_result: ScoreResult) -> List[Dict[str, Any]]:
         weaknesses = []
         for key, value in score_result.scores.to_dict().items():

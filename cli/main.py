@@ -221,7 +221,7 @@ def transcribe(audio_file):
         transcriber = create_transcriber(
             settings.SPEECH_TO_TEXT_PROVIDER,
             settings.DASHSCOPE_API_KEY,
-            settings.WHISPER_MODEL,
+            settings.DASHSCOPE_ASR_MODEL,
         )
         text = transcriber.transcribe(audio_file)
         console.print("[bold green]转录完成。[/bold green]")

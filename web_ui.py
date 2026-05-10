@@ -1,4 +1,7 @@
 import os
+import json
+import hashlib
+import tempfile
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -6,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from adapters.speech_to_text import create_transcriber
 from config import settings
 from core.analyzer import Analyzer
 from core.copywriter import Copywriter
@@ -164,6 +168,66 @@ def shooting_guide_dataframe(score_result):
     )
 
 
+def build_director_context(score_result) -> str:
+    guide = score_result.shooting_guide
+    context = {
+        "original_script": st.session_state.get("last_original_script", ""),
+        "composite": round(score_result.composite, 2),
+        "scores": score_result.scores.to_dict(),
+        "reasons": score_result.reasons,
+        "storyboard_guide": [scene.model_dump() for scene in score_result.storyboard_guide],
+        "shooting_guide": guide.model_dump() if guide else {},
+    }
+    return json.dumps(context, ensure_ascii=False, indent=2)
+
+
+def render_director_chat(score_result, copywriter):
+    context_text = build_director_context(score_result)
+    context_id = hashlib.sha256(context_text.encode("utf-8")).hexdigest()
+    if st.session_state.get("director_context_id") != context_id:
+        st.session_state.director_context_id = context_id
+        st.session_state.director_context = context_text
+        st.session_state.director_chat_messages = [
+            {
+                "role": "assistant",
+                "content": "我已读完当前评分结果、分镜脚本和拍摄指导。可以继续问我镜头调整、天气备选、连载策划、平台适配或现场执行问题。",
+            }
+        ]
+
+    st.markdown('<p class="section-title">AI 导演智囊</p>', unsafe_allow_html=True)
+    st.caption("基于上方评分、分镜和拍摄指导继续追问。")
+
+    messages = st.session_state.get("director_chat_messages", [])
+    for message in messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    question = st.chat_input(
+        "例如：第一镜如果遇到下雨天怎么改？接下来的视频该怎么策划连载？",
+        key="director_chat_input",
+    )
+    if question:
+        user_message = {"role": "user", "content": question}
+        st.session_state.director_chat_messages.append(user_message)
+        with st.chat_message("user"):
+            st.markdown(question)
+
+        with st.chat_message("assistant"):
+            with st.spinner("AI 导演正在结合当前方案思考..."):
+                try:
+                    answer = copywriter.director_chat(
+                        st.session_state.director_context,
+                        st.session_state.director_chat_messages,
+                        question,
+                    )
+                    st.markdown(answer)
+                    st.session_state.director_chat_messages.append({"role": "assistant", "content": answer})
+                except Exception as exc:
+                    error_message = f"导演智囊回答失败：{type(exc).__name__}: {exc}"
+                    st.error(error_message)
+                    st.session_state.director_chat_messages.append({"role": "assistant", "content": error_message})
+
+
 def render_score_results(score_result, copywriter):
     st.markdown('<p class="section-title">评分总览</p>', unsafe_allow_html=True)
     st.dataframe(score_dataframe(score_result), use_container_width=True, hide_index=True)
@@ -195,6 +259,7 @@ def render_score_results(score_result, copywriter):
 
     st.markdown('<p class="section-title">手机拍摄执行指导</p>', unsafe_allow_html=True)
     st.dataframe(shooting_guide_dataframe(score_result), use_container_width=True, hide_index=True)
+    render_director_chat(score_result, copywriter)
 
 
 def build_evaluation_record(title: str, script_path: str, score_result) -> dict:
@@ -228,6 +293,13 @@ def save_script(input_text: str) -> tuple:
     with open(script_path, "w", encoding="utf-8") as file:
         file.write(f"# {script_title}\n\n{input_text}")
     return script_title, script_path
+
+
+def save_uploaded_media(uploaded_file) -> str:
+    suffix = Path(uploaded_file.name).suffix or ".mp3"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+        temp_file.write(uploaded_file.getbuffer())
+        return temp_file.name
 
 
 def render_excel_download(path_value: str, label: str, key: str):
@@ -331,7 +403,53 @@ with st.sidebar:
 
 render_header(state)
 
-tab_plan, tab_predict, tab_history, tab_retro = st.tabs(["文案生产与评估", "播放预测", "历史资产", "数据校准"])
+tab_breakdown, tab_plan, tab_predict, tab_history, tab_retro = st.tabs(
+    ["爆款视频/音频拆解", "文案生产与评估", "播放预测", "历史资产", "数据校准"]
+)
+
+with tab_breakdown:
+    st.markdown('<p class="section-title">上传视频/音频并转写</p>', unsafe_allow_html=True)
+    st.caption("支持常见音频文件，也可尝试上传带清晰人声的视频文件。转写完成后会自动填入文案评估输入框。")
+    uploaded_media = st.file_uploader(
+        "选择要拆解的文件",
+        type=["mp3", "wav", "m4a", "aac", "flac", "ogg", "opus", "mp4", "mov"],
+        accept_multiple_files=False,
+        key="breakdown_media_uploader",
+    )
+
+    if uploaded_media is not None:
+        st.info(f"已选择：{uploaded_media.name}")
+        if st.button("开始转写并填入文案评估", type="primary", use_container_width=True, key="transcribe_uploaded_media"):
+            temp_path = None
+            with st.spinner("正在调用阿里云 DashScope ASR 转写..."):
+                try:
+                    temp_path = save_uploaded_media(uploaded_media)
+                    transcriber = create_transcriber(
+                        settings.SPEECH_TO_TEXT_PROVIDER,
+                        settings.DASHSCOPE_API_KEY,
+                        settings.DASHSCOPE_ASR_MODEL,
+                    )
+                    transcript = transcriber.transcribe(temp_path)
+                    st.session_state.asr_transcript = transcript
+                    st.session_state.main_script_input = transcript
+                    st.session_state.pop("optimized_script_result", None)
+                    st.success("转写完成，文字已填入【文案生产与评估】输入框。")
+                except Exception as exc:
+                    st.error(f"转写失败：{type(exc).__name__}: {exc}")
+                    with st.expander("查看 ASR 错误详情", expanded=True):
+                        st.exception(exc)
+                finally:
+                    if temp_path:
+                        try:
+                            Path(temp_path).unlink(missing_ok=True)
+                        except OSError:
+                            pass
+
+    if st.session_state.get("asr_transcript"):
+        st.text_area("最近一次转写结果", st.session_state.asr_transcript, height=260)
+        if st.button("再次填入文案评估", use_container_width=True, key="reuse_asr_transcript"):
+            st.session_state.main_script_input = st.session_state.asr_transcript
+            st.success("已重新填入【文案生产与评估】输入框。")
 
 with tab_plan:
     left_col, right_col = st.columns([0.92, 1.55], gap="large")

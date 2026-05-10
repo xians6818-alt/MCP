@@ -404,6 +404,32 @@ Return exactly this shape:
             raise ValueError(f"LLM optimization returned no optimized_script. Fields: {', '.join(payload.keys())}")
         return OptimizedScriptResult.model_validate(payload)
 
+    def director_chat(self, context: str, messages: List[Dict[str, str]], question: str) -> str:
+        recent_messages = messages[-8:] if messages else []
+        history_text = "\n".join(
+            f"{item.get('role', 'user')}: {item.get('content', '')}" for item in recent_messages
+        )
+        prompt = f"""你是【AI 导演智囊】，一位擅长短视频策划、手机实拍执行、爆款脚本迭代的中文导演顾问。
+
+回答要求：
+- 必须结合下方“当前评分结果、分镜脚本、拍摄指导、原始文案”来回答。
+- 用户问到某一镜时，要尽量指出对应镜号，并给出可直接执行的替代方案。
+- 语言要适合非技术运营人员，具体、白话、能落地。
+- 不要虚构产品功效、价格、政策等无法从上下文确认的信息。
+- 如果用户问连载策划，给出主题、钩子、拍法和下一步数据验证点。
+- 保持简洁，优先输出可执行清单。
+
+当前上下文：
+{context}
+
+最近对话：
+{history_text}
+
+用户最新问题：
+{question}
+"""
+        return self._call_llm(prompt, temperature=0.55)
+
     def analyze_counterfactual(self, script: str, scores: DimensionScores, composite: float, bucket: str) -> str:
         prompt = f"""Write a concise counterfactual analysis in Simplified Chinese.
 

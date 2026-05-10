@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     LLM_MAX_RETRIES: int = 2
     
     DASHSCOPE_API_KEY: str = Field(default_factory=lambda: read_streamlit_secret("DASHSCOPE_API_KEY", "") or "")
+    DASHSCOPE_ASR_MODEL: str = Field(
+        default_factory=lambda: read_streamlit_secret("DASHSCOPE_ASR_MODEL", "paraformer-realtime-v2")
+        or "paraformer-realtime-v2"
+    )
     SUPABASE_URL: str = Field(default_factory=lambda: read_streamlit_secret("SUPABASE_URL", "") or "")
     SUPABASE_KEY: str = Field(default_factory=lambda: read_streamlit_secret("SUPABASE_KEY", "") or "")
     

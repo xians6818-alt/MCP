@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from models.copywriting import OptimizedScriptResult, ScriptIdeaResult
 from models.rubric import Rubric
@@ -17,6 +17,10 @@ class BaseLLMClient(ABC):
 
     @abstractmethod
     def optimize_script(self, original_script: str, score_context: Dict[str, Any]) -> OptimizedScriptResult:
+        pass
+
+    @abstractmethod
+    def director_chat(self, context: str, messages: List[Dict[str, str]], question: str) -> str:
         pass
 
     @abstractmethod
