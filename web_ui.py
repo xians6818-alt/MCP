@@ -51,9 +51,26 @@ def init_clients():
     copywriter = Copywriter(llm_client)
     file_storage = FileStorage(settings.PREDICTIONS_DIR, settings.SCRIPTS_DIR)
     json_storage = SupabaseStorage(settings.STATE_FILE)
-    rubric_engine.rubric = json_storage.load_active_rubric(rubric_engine.rubric)
+    safe_load_active_rubric(rubric_engine, json_storage)
     excel_exporter = ExcelExporter(settings.EXPORTS_DIR)
     return rubric_engine, analyzer, predictor, bump_validator, copywriter, file_storage, json_storage, excel_exporter
+
+
+def storage_supports_rubric_versions(json_storage) -> bool:
+    required_methods = ("load_active_rubric", "list_rubric_versions", "save_rubric_version", "set_active_rubric_version")
+    return all(callable(getattr(json_storage, method, None)) for method in required_methods)
+
+
+def safe_load_active_rubric(rubric_engine, json_storage):
+    if not callable(getattr(json_storage, "load_active_rubric", None)):
+        st.session_state.rubric_load_warning = "当前存储层暂不支持云端 Rubric 版本，已使用默认评分规则。"
+        return
+
+    try:
+        rubric_engine.rubric = json_storage.load_active_rubric(rubric_engine.rubric)
+        st.session_state.pop("rubric_load_warning", None)
+    except Exception as exc:
+        st.session_state.rubric_load_warning = f"云端 Rubric 加载失败，已使用默认评分规则：{type(exc).__name__}: {exc}"
 
 
 def inject_style():
@@ -481,34 +498,47 @@ def render_prediction_insights(prediction):
 
 def render_rubric_governance(rubric_engine, bump_validator, json_storage):
     rubric = rubric_engine.rubric
+    supports_rubric_versions = storage_supports_rubric_versions(json_storage)
     st.markdown('<p class="section-title">评分规则治理</p>', unsafe_allow_html=True)
     st.caption("用于查看当前 7 维评分规则，并在有足够复盘样本后验证权重升级方案。")
+    if st.session_state.get("rubric_load_warning"):
+        st.warning(st.session_state.rubric_load_warning)
 
-    rubric_versions = json_storage.list_rubric_versions()
-    if rubric_versions:
-        version_options = [item["version"] for item in rubric_versions]
-        active_version = next((item["version"] for item in rubric_versions if item.get("is_active")), rubric.current_version)
-        selected_version = st.selectbox(
-            "云端 Rubric 版本",
-            version_options,
-            index=version_options.index(active_version) if active_version in version_options else 0,
-        )
-        if st.button("切换为当前版本", use_container_width=True, key="activate_selected_rubric"):
-            try:
-                json_storage.set_active_rubric_version(selected_version)
-                st.success(f"已切换活跃 Rubric：{selected_version}。页面刷新后生效。")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"切换 Rubric 失败：{type(exc).__name__}: {exc}")
+    rubric_versions = []
+    if supports_rubric_versions:
+        try:
+            rubric_versions = json_storage.list_rubric_versions()
+        except Exception as exc:
+            supports_rubric_versions = False
+            st.warning(f"云端 Rubric 版本列表读取失败，已切换为本地默认规则展示：{type(exc).__name__}: {exc}")
     else:
-        st.info("尚未发现云端 Rubric 版本。可以先保存当前默认版本作为云端基线。")
-        if st.button("保存当前默认 Rubric 到云端", use_container_width=True, key="seed_default_rubric"):
-            try:
-                json_storage.save_rubric_version(rubric, is_active=True)
-                st.success("默认 Rubric 已保存并激活。")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"保存默认 Rubric 失败：{type(exc).__name__}: {exc}")
+        st.info("当前存储层不支持 Rubric 云端版本持久化，仅展示默认规则并允许本地验证候选方案。")
+
+    if supports_rubric_versions:
+        if rubric_versions:
+            version_options = [item["version"] for item in rubric_versions]
+            active_version = next((item["version"] for item in rubric_versions if item.get("is_active")), rubric.current_version)
+            selected_version = st.selectbox(
+                "云端 Rubric 版本",
+                version_options,
+                index=version_options.index(active_version) if active_version in version_options else 0,
+            )
+            if st.button("切换为当前版本", use_container_width=True, key="activate_selected_rubric"):
+                try:
+                    json_storage.set_active_rubric_version(selected_version)
+                    st.success(f"已切换活跃 Rubric：{selected_version}。页面刷新后生效。")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"切换 Rubric 失败：{type(exc).__name__}: {exc}")
+        else:
+            st.info("尚未发现云端 Rubric 版本。可以先保存当前默认版本作为云端基线。")
+            if st.button("保存当前默认 Rubric 到云端", use_container_width=True, key="seed_default_rubric"):
+                try:
+                    json_storage.save_rubric_version(rubric, is_active=True)
+                    st.success("默认 Rubric 已保存并激活。")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"保存默认 Rubric 失败：{type(exc).__name__}: {exc}")
 
     weights = rubric.current_weights
     st.dataframe(
@@ -583,7 +613,7 @@ def render_rubric_governance(rubric_engine, bump_validator, json_storage):
                 "保存并激活候选 Rubric",
                 type="primary",
                 use_container_width=True,
-                disabled=not can_publish,
+                disabled=not can_publish or not supports_rubric_versions,
                 key="publish_candidate_rubric",
             ):
                 try:
@@ -601,7 +631,10 @@ def render_system_status(rubric_engine, file_storage, json_storage):
     state = json_storage.load_state()
     prediction_files = file_storage.list_predictions()
     script_files = file_storage.list_scripts()
-    rubric_versions = json_storage.list_rubric_versions()
+    try:
+        rubric_versions = json_storage.list_rubric_versions() if callable(getattr(json_storage, "list_rubric_versions", None)) else []
+    except Exception:
+        rubric_versions = []
     active_rubric = next((item for item in rubric_versions if item.get("is_active")), None)
 
     col1, col2, col3, col4 = st.columns(4)
